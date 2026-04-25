@@ -25,6 +25,9 @@ export async function POST(req: Request) {
       headers: {
         'Authorization': `Bearer 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`,
         'Content-Type': 'application/json',
+        // OPENROUTER FREE MODELS REQUIRE THESE TWO HEADERS:
+        'HTTP-Referer': 'https://fuishan-powered-by-nvidia.vercel.app', 
+        'X-Title': 'FUISHAN Vibe Coder',
       },
       body: JSON.stringify({
         model: 'nvidia/llama-3.1-nemotron-70b-instruct:free',
@@ -33,15 +36,19 @@ export async function POST(req: Request) {
     });
 
     if (!response.ok) {
-      throw new Error(`OpenRouter Error: ${response.statusText}`);
+      const errorText = await response.text();
+      throw new Error(`OpenRouter Error ${response.status}: ${errorText}`);
     }
 
     const data = await response.json();
     let content = data.choices[0].message.content;
 
-    // Extract HTML out of the markdown wrapper
-    const match = content.match(/```html\n([\s\S]*?)\n```/);
-    const code = match ? match[1] : content.replace(/```/g, ''); // Fallback just in case
+    // Better regex to extract HTML even if the model formats it weirdly
+    const match = content.match(/```html\n([\s\S]*?)\n```/i);
+    let code = match ? match[1] : content;
+    
+    // Clean up rogue markdown backticks just in case
+    code = code.replace(/^```html/i, '').replace(/```$/, '').trim();
 
     return NextResponse.json({ code, raw: content });
   } catch (error) {
