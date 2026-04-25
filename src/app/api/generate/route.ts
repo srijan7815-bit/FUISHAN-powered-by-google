@@ -20,29 +20,31 @@ export async function POST(req: Request) {
   try {
     const { messages } = await req.json();
 
-    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    // 🚀 BYPASSING OPENROUTER ENTIRELY 
+    // Hitting Google AI Studio's direct OpenAI-compatible endpoint
+    const response = await fetch('https://generativelanguage.googleapis.com/v1beta/openai/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer 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`,
+        // 👇 PASTE YOUR GOOGLE AI STUDIO API KEY HERE
+        'Authorization': `Bearer AIzaSyCBtWxWxIoMg0I6OM2-bU16zMo7Hc9E4Mg`, 
         'Content-Type': 'application/json',
-        'HTTP-Referer': 'https://fuishan-powered-by-nvidia.vercel.app', 
-        'X-Title': 'FUISHAN Vibe Coder',
       },
       body: JSON.stringify({
-        // 🚀 Swapped to Gemma!
-        model: 'google/gemma-4-31b-it',
+        // Specifically requesting the Gemma 4 model
+        model: 'gemma-4-31b-it',
         messages:[{ role: 'system', content: SYSTEM_PROMPT }, ...messages],
       })
     });
+
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`OpenRouter Error ${response.status}: ${errorText}`);
+      throw new Error(`Google API Error ${response.status}: ${errorText}`);
     }
 
     const data = await response.json();
     let content = data.choices[0].message.content;
 
-    // Better regex to extract HTML even if the model formats it weirdly
+    // Extract HTML out of the markdown wrapper
     const match = content.match(/```html\n([\s\S]*?)\n```/i);
     let code = match ? match[1] : content;
     
