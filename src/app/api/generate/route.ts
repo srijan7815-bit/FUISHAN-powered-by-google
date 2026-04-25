@@ -25,16 +25,15 @@ export async function POST(req: Request) {
       headers: {
         'Authorization': `Bearer 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`,
         'Content-Type': 'application/json',
-        // OPENROUTER FREE MODELS REQUIRE THESE TWO HEADERS:
         'HTTP-Referer': 'https://fuishan-powered-by-nvidia.vercel.app', 
         'X-Title': 'FUISHAN Vibe Coder',
       },
       body: JSON.stringify({
+        // 🚀 Swapped to Gemma!
         model: 'google/gemma-4-31b-it:free',
         messages:[{ role: 'system', content: SYSTEM_PROMPT }, ...messages],
       })
     });
-
     if (!response.ok) {
       const errorText = await response.text();
       throw new Error(`OpenRouter Error ${response.status}: ${errorText}`);
