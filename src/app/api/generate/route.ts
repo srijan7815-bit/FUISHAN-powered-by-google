@@ -30,7 +30,7 @@ export async function POST(req: Request) {
       },
       body: JSON.stringify({
         // 🚀 Swapped to Gemma!
-        model: 'google/gemma-4-31b-it:free',
+        model: 'google/gemma-4-31b-it',
         messages:[{ role: 'system', content: SYSTEM_PROMPT }, ...messages],
       })
     });
