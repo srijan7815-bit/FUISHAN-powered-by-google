@@ -30,7 +30,7 @@ export async function POST(req: Request) {
         'X-Title': 'FUISHAN Vibe Coder',
       },
       body: JSON.stringify({
-        model: 'nvidia/nemotron-3-super-120b-a12b:free',
+        model: 'google/gemma-4-31b-it:free',
         messages:[{ role: 'system', content: SYSTEM_PROMPT }, ...messages],
       })
     });
