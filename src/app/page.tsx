@@ -9,14 +9,14 @@ export default function FuishanApp() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [currentCode, setCurrentCode] = useState<string | null>(null);
-  const[view, setView] = useState<"preview" | "code">("preview");
+  const[currentCode, setCurrentCode] = useState<string | null>(null);
+  const [view, setView] = useState<"preview" | "code">("preview");
 
   // GitHub States
-  const [showGithubConfig, setShowGithubConfig] = useState(false);
-  const[githubPAT, setGithubPAT] = useState("");
+  const[showGithubConfig, setShowGithubConfig] = useState(false);
+  const [githubPAT, setGithubPAT] = useState("");
   const [githubRepo, setGithubRepo] = useState("");
-  const[isPushing, setIsPushing] = useState(false);
+  const [isPushing, setIsPushing] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -36,7 +36,7 @@ export default function FuishanApp() {
   const handleSend = async () => {
     if (!input.trim()) return;
 
-    const newMessages: Message[] = [...messages, { role: "user", content: input }];
+    const newMessages: Message[] =[...messages, { role: "user", content: input }];
     setMessages(newMessages);
     setInput("");
     setIsLoading(true);
@@ -73,49 +73,93 @@ export default function FuishanApp() {
     }
     if (!currentCode) return;
 
+    // Basic format validation
+    if (!githubRepo.includes('/')) {
+      alert("Please format your repo as: username/repo-name");
+      return;
+    }
+
     setIsPushing(true);
-    // Save locally so user doesn't have to enter it again
+    // Save locally
     localStorage.setItem("fuishan_github_pat", githubPAT);
     localStorage.setItem("fuishan_github_repo", githubRepo);
 
     try {
+      const repoParts = githubRepo.split('/');
+      const repoOwner = repoParts[0];
+      const repoName = repoParts[1];
+
+      // 1. Check if the repository exists
+      const repoUrl = `https://api.github.com/repos/${repoOwner}/${repoName}`;
+      const repoRes = await fetch(repoUrl, {
+        headers: { Authorization: `token ${githubPAT}` }
+      });
+
+      if (repoRes.status === 404) {
+        // Repo does not exist, let's CREATE it!
+        const createRes = await fetch(`https://api.github.com/user/repos`, {
+          method: "POST",
+          headers: {
+            Authorization: `token ${githubPAT}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            name: repoName,
+            description: "App vibe-coded using FUISHAN 🚀",
+            private: false,
+            auto_init: true // This auto-creates a main branch so we can instantly push to it
+          }),
+        });
+
+        if (!createRes.ok) {
+          const err = await createRes.json();
+          throw new Error(`Could not create repo: ${err.message}`);
+        }
+        
+        // Wait 1.5 seconds for GitHub's servers to fully initialize the new main branch
+        await new Promise(resolve => setTimeout(resolve, 1500));
+      } else if (!repoRes.ok) {
+        throw new Error(`Failed to access repo: ${repoRes.statusText}`);
+      }
+
+      // 2. Now push the code to the repository (whether it just got created or already existed)
       const path = "index.html";
-      const url = `https://api.github.com/repos/${githubRepo}/contents/${path}`;
+      const fileUrl = `https://api.github.com/repos/${repoOwner}/${repoName}/contents/${path}`;
       
-      // 1. Check if file exists to get the SHA
-      const getRes = await fetch(url, { headers: { Authorization: `token ${githubPAT}` } });
+      // Get SHA if file already exists
+      const getRes = await fetch(fileUrl, { headers: { Authorization: `token ${githubPAT}` } });
       let sha = null;
       if (getRes.ok) {
         const fileData = await getRes.json();
         sha = fileData.sha;
       }
 
-      // 2. Base64 encode the code in the browser safely
+      // Base64 encode the code safely
       const base64Content = btoa(unescape(encodeURIComponent(currentCode)));
 
-      // 3. Push file
-      const putRes = await fetch(url, {
+      // Push file
+      const putRes = await fetch(fileUrl, {
         method: "PUT",
         headers: {
           Authorization: `token ${githubPAT}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          message: "FUISHAN: Vibe-coded update 🚀",
+          message: "FUISHAN: Deployed new code iteration 🚀",
           content: base64Content,
           ...(sha ? { sha } : {}),
         }),
       });
 
       if (putRes.ok) {
-        alert("Successfully pushed to GitHub!");
+        alert(`Successfully pushed to https://github.com/${repoOwner}/${repoName}`);
         setShowGithubConfig(false);
       } else {
         const err = await putRes.json();
-        alert(`Failed to push: ${err.message}`);
+        throw new Error(`Failed to write file: ${err.message}`);
       }
     } catch (error) {
-      alert("An error occurred pushing to GitHub.");
+      alert((error as Error).message || "An error occurred connecting to GitHub.");
     } finally {
       setIsPushing(false);
     }
@@ -142,18 +186,18 @@ export default function FuishanApp() {
         {showGithubConfig && (
           <div className="p-4 border-b border-[#222] bg-[#0a0a0a]">
             <p className="text-xs text-gray-400 mb-4 font-sans">
-              Enter your credentials to push generated apps directly to a repo. Credentials are saved locally.
+              Enter credentials to push to GitHub. If the repo doesn't exist, FUISHAN will create it for you.
             </p>
             <input
               type="password"
-              placeholder="GitHub PAT"
+              placeholder="GitHub PAT (must have 'repo' scope)"
               value={githubPAT}
               onChange={(e) => setGithubPAT(e.target.value)}
               className="w-full bg-black border border-[#333] text-sm p-2 mb-2 rounded focus:outline-none focus:border-red-500"
             />
             <input
               type="text"
-              placeholder="Username/Repo (e.g. jdoe/my-app)"
+              placeholder="Username/Repo (e.g. srijan/new-app)"
               value={githubRepo}
               onChange={(e) => setGithubRepo(e.target.value)}
               className="w-full bg-black border border-[#333] text-sm p-2 mb-4 rounded focus:outline-none focus:border-red-500"
@@ -166,7 +210,7 @@ export default function FuishanApp() {
               }}
               className="w-full flex items-center justify-center gap-2 bg-white text-black py-2 rounded text-sm hover:bg-gray-200 transition-colors"
             >
-              <Save size={16} /> Save Locally
+              <Save size={16} /> Save Settings
             </button>
           </div>
         )}
