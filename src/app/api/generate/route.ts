@@ -6,39 +6,37 @@ You must output clean, single-file code (HTML/Tailwind/JS) that the user can ins
 
 CRITICAL RULES:
 1. Always output ONLY valid HTML code. Include <script src="https://cdn.tailwindcss.com"></script> in the <head> for styling.
-2. Do not write backend code. Rely on frontend JavaScript and mock data if necessary.
-3. Design aesthetic: Modern, minimalist, clean (like Vercel or Nothing OS), utilizing neutral palettes unless specified.
-4. Enclose your full code strictly inside an HTML codeblock, like so:
-\`\`\`html
-<!DOCTYPE html>
-<html>...</html>
-\`\`\`
-5. Do not include introductory or concluding text. Respond ONLY with the HTML block.
+2. DO NOT USE STANDARD HTML NAVIGATION LINKS (e.g., <a href="about.html">). Because this is a single-file sandbox, standard links will crash the preview.
+3. If the user asks for multiple pages, you MUST build a Single Page Application (SPA). Use JavaScript and CSS (hidden/block) to swap between "pages" (div containers) when navigation menus are clicked. 
+4. Design aesthetic: Modern, minimalist, clean (like Vercel or Nothing OS), utilizing neutral palettes unless specified.
+5. Enclose your full code strictly inside an HTML codeblock.
+6. Do not include introductory or concluding text. Respond ONLY with the HTML block.
 `;
 
 export async function POST(req: Request) {
   try {
-    const { messages } = await req.json();
+    const { messages, apiKey, model } = await req.json();
 
-    // 🚀 BYPASSING OPENROUTER ENTIRELY 
-    // Hitting Google AI Studio's direct OpenAI-compatible endpoint
+    if (!apiKey) {
+      throw new Error("Missing API Key. Please add your key in the settings.");
+    }
+
+    // Google AI Studio OpenAI-compatible endpoint
     const response = await fetch('https://generativelanguage.googleapis.com/v1beta/openai/chat/completions', {
       method: 'POST',
       headers: {
-        // 👇 PASTE YOUR GOOGLE AI STUDIO API KEY HERE
-        'Authorization': `Bearer AIzaSyCBtWxWxIoMg0I6OM2-bU16zMo7Hc9E4Mg`, 
+        'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        // Specifically requesting the Gemma 4 model
-        model: 'gemma-4-31b-it',
-        messages:[{ role: 'system', content: SYSTEM_PROMPT }, ...messages],
+        model: model || 'gemma-4-31b-it',
+        messages: [{ role: 'system', content: SYSTEM_PROMPT }, ...messages],
       })
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`Google API Error ${response.status}: ${errorText}`);
+      throw new Error(`API Error ${response.status}: ${errorText}`);
     }
 
     const data = await response.json();
@@ -47,8 +45,6 @@ export async function POST(req: Request) {
     // Extract HTML out of the markdown wrapper
     const match = content.match(/```html\n([\s\S]*?)\n```/i);
     let code = match ? match[1] : content;
-    
-    // Clean up rogue markdown backticks just in case
     code = code.replace(/^```html/i, '').replace(/```$/, '').trim();
 
     return NextResponse.json({ code, raw: content });
