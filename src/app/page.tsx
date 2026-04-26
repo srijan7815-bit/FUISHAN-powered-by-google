@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { Send, Github, Loader2, Code2, MonitorPlay, Save, Settings, Maximize, Minimize, Undo2, Redo2, FolderPlus, MessageSquare, Cloud, UserCircle, Triangle, LogOut, PanelLeftClose, PanelLeftOpen, Hexagon } from "lucide-react";
-// FIREBASE IMPORTS
 import { auth, db, googleProvider } from "../lib/firebase";
 import { signInWithPopup, signOut, onAuthStateChanged, User } from "firebase/auth";
 import { doc, setDoc, getDoc } from "firebase/firestore";
@@ -11,21 +10,21 @@ type Message = { role: "user" | "assistant"; content: string; isCode?: boolean }
 type Project = { id: string; name: string; messages: Message[]; codeHistory: string[] };
 
 export default function FuishanApp() {
-  const [showSettings, setShowSettings] = useState(false);
+  const[showSettings, setShowSettings] = useState(false);
   const [apiKey, setApiKey] = useState("");
-  const [model, setModel] = useState("gemma-4-31b-it");
+  const[model, setModel] = useState("gemma-4-31b-it");
 
-  const [showGithubConfig, setShowGithubConfig] = useState(false);
+  const[showGithubConfig, setShowGithubConfig] = useState(false);
   const [githubPAT, setGithubPAT] = useState("");
   const[githubRepo, setGithubRepo] = useState("");
   const [fileName, setFileName] = useState("index.html");
   const[isPushing, setIsPushing] = useState(false);
 
-  const [projects, setProjects] = useState<Project[]>([]);
+  const[projects, setProjects] = useState<Project[]>([]);
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
   const [historyIndex, setHistoryIndex] = useState(-1);
   const[user, setUser] = useState<User | null>(null);
-  const [isSyncing, setIsSyncing] = useState(false);
+  const[isSyncing, setIsSyncing] = useState(false);
   
   const [input, setInput] = useState("");
   const[isLoading, setIsLoading] = useState(false);
@@ -38,6 +37,27 @@ export default function FuishanApp() {
 
   const currentProject = projects.find(p => p.id === currentProjectId);
   const currentCode = currentProject?.codeHistory[historyIndex] || null;
+
+  // INCEPTION SHIELD: Inject JS into the generated code to block standard <a> tags from crashing the iframe
+  const injectedScript = `<script>
+    document.addEventListener('click', function(e) {
+      const link = e.target.closest('a');
+      if (link) {
+        const href = link.getAttribute('href');
+        if (!href || href === '/' || href === '#' || href.endsWith('.html')) {
+          e.preventDefault();
+          console.log('FUISHAN SHIELD: Blocked bad link navigation.');
+        }
+      }
+    });
+  </script>`;
+  
+  let safeCurrentCode = currentCode || "";
+  if (safeCurrentCode && safeCurrentCode.includes("</head>")) {
+    safeCurrentCode = safeCurrentCode.replace("</head>", injectedScript + "</head>");
+  } else if (safeCurrentCode) {
+    safeCurrentCode = injectedScript + safeCurrentCode;
+  }
 
   const showToast = (message: string, type: "success" | "error") => {
     setToast({ message, type });
@@ -106,7 +126,7 @@ export default function FuishanApp() {
     setHistoryIndex(-1);
   };
 
-  const handleLogin = async () => { try { await signInWithPopup(auth, googleProvider); showToast("Signed in!", "success"); } catch (error) { showToast("Sign in failed.", "error"); } };
+  const handleLogin = async () => { try { await signInWithPopup(auth, googleProvider); showToast("Signed in!", "success"); } catch (error) { showToast("Sign in failed. Check Firebase config.", "error"); } };
   const handleLogout = async () => { await signOut(auth); setProjects([]); showToast("Signed out.", "success"); };
   const handleUndo = () => { if (historyIndex > 0) setHistoryIndex(prev => prev - 1); };
   const handleRedo = () => { if (currentProject && historyIndex < currentProject.codeHistory.length - 1) setHistoryIndex(prev => prev + 1); };
@@ -116,7 +136,7 @@ export default function FuishanApp() {
     if (!apiKey) { showToast("Please set your API Key in Settings.", "error"); setShowSettings(true); return; }
 
     const newMessage: Message = { role: "user", content: input };
-    setProjects(prev => prev.map(p => p.id === currentProjectId ? { ...p, messages: [...p.messages, newMessage] } : p));
+    setProjects(prev => prev.map(p => p.id === currentProjectId ? { ...p, messages:[...p.messages, newMessage] } : p));
     setInput("");
     setIsLoading(true);
 
@@ -198,7 +218,6 @@ export default function FuishanApp() {
         }
       `}</style>
 
-      {/* STRICT SCROLL LOCK: h-screen w-screen overflow-hidden */}
       <div className="h-screen w-screen overflow-hidden bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-indigo-900 via-[#0a0514] to-black text-white p-4 flex gap-4 font-sans selection:bg-purple-500/30">
         
         {toast && (
@@ -213,7 +232,6 @@ export default function FuishanApp() {
             <div className="flex items-center gap-3 text-white font-bold tracking-widest text-xl">
               <Hexagon className="text-purple-500 fill-purple-500/20 animate-pulse" size={24} /> FUISHAN
             </div>
-            {/* TYPE FIX HERE: Wrapped in a span that holds the title attribute */}
             {isSyncing && <span title="Syncing to Cloud..."><Cloud size={16} className="text-purple-400 animate-pulse" /></span>}
           </div>
 
@@ -260,7 +278,6 @@ export default function FuishanApp() {
              <button onClick={() => setShowSettings(!showSettings)} className="p-2 text-gray-400 hover:text-purple-400 hover:bg-white/10 rounded-xl transition-all active:scale-95"><Settings size={18} /></button>
           </div>
 
-          {/* HOVER WRITING EXPANDING SETTINGS */}
           {showSettings && (
             <div className="absolute top-16 left-0 w-full bg-[#13072e]/95 backdrop-blur-3xl border-b border-white/10 p-5 z-20 shadow-2xl">
               <input type="password" placeholder="Google AI Studio Key" value={apiKey} onChange={(e) => setApiKey(e.target.value)} 
@@ -290,7 +307,6 @@ export default function FuishanApp() {
           </div>
 
           <div className="p-4 border-t border-white/10 bg-white/5 rounded-b-3xl shrink-0">
-            {/* HOVER WRITING MAIN INPUT */}
             <div className="relative flex items-end bg-black/40 border border-white/10 rounded-2xl focus-within:border-purple-500/50 focus-within:-translate-y-2 focus-within:shadow-[0_20px_50px_rgba(168,85,247,0.3)] transition-all duration-300 overflow-hidden group">
               <textarea 
                 value={input} 
@@ -304,8 +320,8 @@ export default function FuishanApp() {
           </div>
         </div>
 
-        {/* PANE 3: PREVIEW / SANDBOX */}
-        <div className={`${isFullscreen ? "fixed inset-4 z-50" : "flex-1 min-w-0"} bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl flex flex-col shadow-2xl relative transition-all duration-500 overflow-hidden`}>
+        {/* PANE 3: PREVIEW / SANDBOX - FULLSCREEN FIXED! */}
+        <div className={`${isFullscreen ? "fixed inset-0 z-[999] rounded-none border-none bg-[#0a0514]" : "flex-1 min-w-0 bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl"} flex flex-col shadow-2xl relative transition-all duration-500 overflow-hidden`}>
           <div className="h-16 border-b border-white/10 bg-white/5 flex items-center justify-between px-6 shrink-0">
             <div className="flex gap-2 bg-black/40 p-1 rounded-xl border border-white/5">
               <button onClick={() => setView("preview")} className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-sm transition-all active:scale-95 ${view === "preview" ? "bg-white/10 text-white shadow-md" : "text-gray-400 hover:text-white"}`}><MonitorPlay size={14} /> Preview</button>
@@ -322,7 +338,6 @@ export default function FuishanApp() {
               </button>
 
               <div className="flex items-center gap-2 ml-4 pl-4 border-l border-white/10">
-                 {/* HOVER WRITING FOR GITHUB CONFIG */}
                  {showGithubConfig ? (
                    <div className="flex items-center gap-2 group">
                      <input type="text" placeholder="user/repo" value={githubRepo} onChange={(e)=>setGithubRepo(e.target.value)} className="bg-black/50 border border-white/10 text-xs p-2 rounded-lg focus:outline-none focus:border-purple-500 focus:scale-[1.05] focus:shadow-xl transition-all w-24 focus:w-32" />
@@ -345,15 +360,14 @@ export default function FuishanApp() {
             </div>
           </div>
 
-          <div className="flex-1 min-h-0 w-full bg-[#050505] relative rounded-b-3xl overflow-hidden flex flex-col">
-            {!currentCode ? (
+          <div className={`flex-1 min-h-0 w-full bg-[#050505] relative overflow-hidden flex flex-col ${isFullscreen ? "rounded-none" : "rounded-b-3xl"}`}>
+            {!safeCurrentCode ? (
                <div className="flex h-full items-center justify-center bg-[#0a0514] relative">
-                 {/* WOBBLY LIQUID DROP EMPTY STATE */}
                  <div className="liquid-drop w-64 h-64 opacity-80"></div>
                  <div className="absolute font-bold tracking-[0.5em] text-white/50 z-10 text-xl pointer-events-none mix-blend-overlay">AWAITING INPUT</div>
                </div>
             ) : view === "preview" ? (
-              <iframe srcDoc={currentCode} className="w-full h-full border-none bg-white flex-1" sandbox="allow-scripts allow-forms allow-popups allow-modals allow-same-origin" />
+              <iframe srcDoc={safeCurrentCode} className="w-full h-full border-none bg-white flex-1" sandbox="allow-scripts allow-forms allow-popups allow-modals allow-same-origin" />
             ) : (
               <div className="w-full flex-1 overflow-auto p-6 text-gray-300 text-sm font-mono leading-relaxed bg-[#0a0514]">
                 <pre><code>{currentCode}</code></pre>
