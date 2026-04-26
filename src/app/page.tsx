@@ -322,4 +322,72 @@ export default function FuishanApp() {
             <button onClick={() => setView("preview")} className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-sm transition-all ${view === "preview" ? "bg-white/10 text-white shadow-md" : "text-gray-400 hover:text-white"}`}>
               <MonitorPlay size={14} /> Preview
             </button>
-            <button onClick={() => setView("code")} className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-sm transition-all ${view === "code" ? "bg-white/10 text-white shadow-md
+            <button onClick={() => setView("code")} className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-sm transition-all ${view === "code" ? "bg-white/10 text-white shadow-md" : "text-gray-400 hover:text-white"}`}>
+              <Code2 size={14} /> Code
+            </button>
+          </div>
+
+          <div className="flex items-center gap-3">
+            {/* Feature 1: Undo/Redo Version Control */}
+            <div className="flex items-center gap-1 bg-black/40 rounded-xl border border-white/5 p-1">
+              <button onClick={handleUndo} disabled={historyIndex <= 0} className="p-1.5 text-gray-400 hover:text-white disabled:opacity-30 rounded-lg hover:bg-white/10 transition-all" title="Undo Code"><Undo2 size={16}/></button>
+              <button onClick={handleRedo} disabled={!currentProject || historyIndex >= currentProject.codeHistory.length - 1} className="p-1.5 text-gray-400 hover:text-white disabled:opacity-30 rounded-lg hover:bg-white/10 transition-all" title="Redo Code"><Redo2 size={16}/></button>
+            </div>
+
+            {/* Feature 6: Fullscreen */}
+            <button onClick={() => setIsFullscreen(!isFullscreen)} className="p-2 text-gray-400 hover:text-white bg-black/40 rounded-xl border border-white/5 transition-all">
+              {isFullscreen ? <Minimize size={16}/> : <Maximize size={16}/>}
+            </button>
+
+            {/* Deploy Config */}
+            <div className="flex items-center gap-2 ml-4 pl-4 border-l border-white/10">
+               {showGithubConfig ? (
+                 <div className="flex items-center gap-2">
+                   <input type="text" placeholder="user/repo" value={githubRepo} onChange={(e)=>setGithubRepo(e.target.value)} className="bg-black/50 border border-white/10 text-xs p-2 rounded-lg focus:border-purple-500 w-24" />
+                   <input type="password" placeholder="PAT" value={githubPAT} onChange={(e)=>setGithubPAT(e.target.value)} className="bg-black/50 border border-white/10 text-xs p-2 rounded-lg focus:border-purple-500 w-20" />
+                   <button onClick={() => setShowGithubConfig(false)} className="bg-purple-600 text-xs px-3 py-2 rounded-lg hover:bg-purple-500">Save</button>
+                 </div>
+               ) : (
+                 <>
+                   <button onClick={() => setShowGithubConfig(true)} className="p-2 text-gray-400 hover:text-white transition-all"><Settings size={16}/></button>
+                   <input type="text" value={fileName} onChange={(e) => setFileName(e.target.value)} className="bg-black/40 border border-white/5 text-xs p-2 rounded-xl text-gray-300 focus:outline-none focus:border-purple-500 w-28" />
+                   <button onClick={handleGithubPush} disabled={!currentCode || isPushing} className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white transition-all rounded-xl shadow-lg shadow-purple-500/20 text-sm font-medium disabled:opacity-50">
+                    {isPushing ? <Loader2 size={14} className="animate-spin" /> : <Github size={14} />} Push
+                   </button>
+                   
+                   {/* Feature 2: Deploy to Vercel */}
+                   {githubRepo && (
+                     <a href={`https://vercel.com/new/clone?repository-url=https://github.com/${githubRepo}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-4 py-2 bg-black hover:bg-[#111] text-white border border-white/20 transition-all rounded-xl shadow-lg text-sm font-medium">
+                       ▲ Vercel
+                     </a>
+                   )}
+                 </>
+               )}
+            </div>
+          </div>
+        </div>
+
+        {/* Sandbox Frame */}
+        <div className="flex-1 w-full bg-[#050505] relative rounded-b-3xl overflow-hidden">
+          {!currentCode ? (
+             <div className="flex h-full items-center justify-center text-gray-600 font-medium tracking-widest bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]">
+               WAITING FOR INPUT...
+             </div>
+          ) : view === "preview" ? (
+            <iframe
+              srcDoc={currentCode}
+              title="Sandbox"
+              className="w-full h-full border-none bg-white"
+              sandbox="allow-scripts allow-forms allow-popups allow-modals allow-same-origin"
+            />
+          ) : (
+            <div className="w-full h-full overflow-auto p-6 text-gray-300 text-sm font-mono leading-relaxed bg-[#0a0514]">
+              <pre><code>{currentCode}</code></pre>
+            </div>
+          )}
+        </div>
+      </div>
+
+    </div>
+  );
+}
