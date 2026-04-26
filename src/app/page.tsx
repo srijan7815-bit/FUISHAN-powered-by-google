@@ -24,14 +24,14 @@ export default function FuishanApp() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
   const [historyIndex, setHistoryIndex] = useState(-1);
-  const [user, setUser] = useState<User | null>(null);
+  const[user, setUser] = useState<User | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
   
   const [input, setInput] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
+  const[isLoading, setIsLoading] = useState(false);
   const [view, setView] = useState<"preview" | "code">("preview");
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const[isSidebarOpen, setIsSidebarOpen] = useState(true); // NEW: Sidebar Toggle State
+  const[isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -213,7 +213,8 @@ export default function FuishanApp() {
             <div className="flex items-center gap-3 text-white font-bold tracking-widest text-xl">
               <Hexagon className="text-purple-500 fill-purple-500/20 animate-pulse" size={24} /> FUISHAN
             </div>
-            {isSyncing && <Cloud size={16} className="text-purple-400 animate-pulse" title="Syncing to Cloud..." />}
+            {/* TYPE FIX HERE: Wrapped in a span that holds the title attribute */}
+            {isSyncing && <span title="Syncing to Cloud..."><Cloud size={16} className="text-purple-400 animate-pulse" /></span>}
           </div>
 
           <div className="flex-1 overflow-y-auto space-y-2 pr-2 scrollbar-hide min-w-max">
