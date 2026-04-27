@@ -83,4 +83,3 @@ Distributed under the MIT License. See LICENSE for more information. Built for t
 <div align="center">
 <em><strong>new-order-is-upon-us</strong></em>
 </div>
-```
