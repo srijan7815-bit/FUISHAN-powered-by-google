@@ -33,6 +33,7 @@ export default function FuishanApp() {
   const [view, setView] = useState<"preview" | "code">("preview");
   const [isFullscreen, setIsFullscreen] = useState(false);
   const[isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [mobileTab, setMobileTab] = useState<"chat" | "preview">("chat"); // NEW: Mobile UI State
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -67,6 +68,9 @@ export default function FuishanApp() {
 
   // INITIALIZATION & FIREBASE AUTH
   useEffect(() => {
+    // Auto-close sidebar on mobile devices for clean initial load
+    if (window.innerWidth < 768) setIsSidebarOpen(false);
+
     const savedPAT = localStorage.getItem("fuishan_github_pat");
     const savedRepo = localStorage.getItem("fuishan_github_repo");
     const savedApiKey = localStorage.getItem("fuishan_api_key");
@@ -92,7 +96,6 @@ export default function FuishanApp() {
             createNewProject();
           }
         } catch (error) {
-          console.error("Firebase Read Error:", error);
           showToast("Firebase Error: Check Firestore Security Rules!", "error");
           createNewProject();
         }
@@ -118,18 +121,15 @@ export default function FuishanApp() {
   // AUTO-SAVE (LOCAL + CLOUD)
   useEffect(() => {
     if (!isLoaded || projects.length === 0) return;
-    
     localStorage.setItem("fuishan_projects", JSON.stringify(projects));
     
     if (user) {
       const syncToCloud = async () => {
         setIsSyncing(true);
         try { 
-          // BULLETPROOF FIX: Deep clone and strip any accidental 'undefined' fields before syncing
           const sanitizedProjects = JSON.parse(JSON.stringify(projects));
           await setDoc(doc(db, "users", user.uid), { projects: sanitizedProjects }, { merge: true }); 
         } catch (e) { 
-          console.error("Cloud sync failed", e);
           showToast("Cloud Sync Blocked: Check Firebase Rules!", "error"); 
         } finally { 
           setIsSyncing(false); 
@@ -139,42 +139,38 @@ export default function FuishanApp() {
       return () => clearTimeout(timeoutId);
     }
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [projects, user, isLoaded]);
+  },[projects, user, isLoaded]);
 
-  // CREATE NEW PROJECT
+  // WORKSPACE CONTROLS
   const createNewProject = () => {
     const newProj: Project = { id: Date.now().toString(), name: `Project ${projects.length + 1}`, messages:[], codeHistory:[] };
     setProjects(prev =>[...prev, newProj]);
     setCurrentProjectId(newProj.id);
     setHistoryIndex(-1);
+    if (window.innerWidth < 768) setIsSidebarOpen(false); // Auto close sidebar on mobile
   };
 
-  // DELETE PROJECT
   const deleteProject = (e: React.MouseEvent, idToDelete: string) => {
     e.stopPropagation(); 
     if (!confirm("Are you sure you want to delete this project?")) return;
-
     setProjects(prev => {
       const updatedProjects = prev.filter(p => p.id !== idToDelete);
-      
       if (updatedProjects.length === 0) {
         const freshProj: Project = { id: Date.now().toString(), name: `Project 1`, messages: [], codeHistory:[] };
         setCurrentProjectId(freshProj.id);
         setHistoryIndex(-1);
         return [freshProj];
       }
-
       if (currentProjectId === idToDelete) {
         setCurrentProjectId(updatedProjects[0].id);
         setHistoryIndex(updatedProjects[0].codeHistory.length - 1);
       }
-
       return updatedProjects;
     });
     showToast("Project deleted.", "success");
   };
 
-  const handleLogin = async () => { try { await signInWithPopup(auth, googleProvider); showToast("Signed in!", "success"); } catch (error) { showToast("Sign in failed. Check Firebase config.", "error"); } };
+  const handleLogin = async () => { try { await signInWithPopup(auth, googleProvider); showToast("Signed in!", "success"); } catch (error) { showToast("Sign in failed. Check config.", "error"); } };
   const handleLogout = async () => { await signOut(auth); setProjects([]); showToast("Signed out.", "success"); };
   const handleUndo = () => { if (historyIndex > 0) setHistoryIndex(prev => prev - 1); };
   const handleRedo = () => { if (currentProject && historyIndex < currentProject.codeHistory.length - 1) setHistoryIndex(prev => prev + 1); };
@@ -202,10 +198,7 @@ export default function FuishanApp() {
       });
       const data = await res.json();
       
-      // BULLETPROOF FIX: Catch API errors BEFORE they corrupt the chat history and crash Firebase
-      if (!res.ok || data.error) {
-        throw new Error(data.error || "The AI Provider returned an error. Please try again.");
-      }
+      if (!res.ok || data.error) throw new Error(data.error || "The AI Provider returned an error.");
       
       setProjects(prev => prev.map(p => {
         if (p.id !== currentProjectId) return p;
@@ -217,13 +210,13 @@ export default function FuishanApp() {
           updatedHistory.push(data.code);
           setHistoryIndex(updatedHistory.length - 1);
           newMsg = { role: "assistant", content: "Code updated! Check the preview.", isCode: true };
+          if (window.innerWidth < 768) setMobileTab("preview"); // Auto-switch to preview on mobile
         } else {
           newMsg = { role: "assistant", content: data.raw, isCode: false };
         }
         return { ...p, messages:[...p.messages, newMsg], codeHistory: updatedHistory };
       }));
     } catch (error) {
-      console.error(error);
       showToast(`API Error: ${(error as Error).message}`, "error");
     } finally {
       setIsLoading(false);
@@ -263,26 +256,10 @@ export default function FuishanApp() {
     <>
       <style>{`
         /* FLUID GLASSMORPHISM BACKGROUND */
-        @keyframes fluid1 {
-          0% { transform: translate(0, 0) scale(1); }
-          33% { transform: translate(5%, -10%) scale(1.2); }
-          66% { transform: translate(-5%, 5%) scale(0.9); }
-          100% { transform: translate(0, 0) scale(1); }
-        }
-        @keyframes fluid2 {
-          0% { transform: translate(0, 0) scale(1); }
-          33% { transform: translate(-10%, 5%) scale(1.1); }
-          66% { transform: translate(10%, -5%) scale(1.3); }
-          100% { transform: translate(0, 0) scale(1); }
-        }
-        @keyframes fluid3 {
-          0% { transform: translate(0, 0) scale(1); }
-          50% { transform: translate(5%, 10%) scale(1.4); }
-          100% { transform: translate(0, 0) scale(1); }
-        }
-        .fluid-bg {
-          position: absolute; inset: 0; overflow: hidden; background: #030303; z-index: 0;
-        }
+        @keyframes fluid1 { 0% { transform: translate(0, 0) scale(1); } 33% { transform: translate(5%, -10%) scale(1.2); } 66% { transform: translate(-5%, 5%) scale(0.9); } 100% { transform: translate(0, 0) scale(1); } }
+        @keyframes fluid2 { 0% { transform: translate(0, 0) scale(1); } 33% { transform: translate(-10%, 5%) scale(1.1); } 66% { transform: translate(10%, -5%) scale(1.3); } 100% { transform: translate(0, 0) scale(1); } }
+        @keyframes fluid3 { 0% { transform: translate(0, 0) scale(1); } 50% { transform: translate(5%, 10%) scale(1.4); } 100% { transform: translate(0, 0) scale(1); } }
+        .fluid-bg { position: absolute; inset: 0; overflow: hidden; background: #030303; z-index: 0; }
         .f-blob1 { position: absolute; top: -20%; left: -10%; width: 70%; height: 70%; background: radial-gradient(circle, rgba(168,85,247,0.3) 0%, transparent 60%); animation: fluid1 15s infinite ease-in-out; filter: blur(60px); }
         .f-blob2 { position: absolute; bottom: -20%; right: -10%; width: 80%; height: 80%; background: radial-gradient(circle, rgba(99,102,241,0.2) 0%, transparent 60%); animation: fluid2 18s infinite ease-in-out reverse; filter: blur(60px); }
         .f-blob3 { position: absolute; top: 30%; left: 30%; width: 50%; height: 50%; background: radial-gradient(circle, rgba(236,72,153,0.2) 0%, transparent 60%); animation: fluid3 20s infinite ease-in-out; filter: blur(60px); }
@@ -290,17 +267,23 @@ export default function FuishanApp() {
         .glass-content { position: relative; z-index: 20; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; }
       `}</style>
 
-      {/* DARK AESTHETIC BASE */}
-      <div className="h-screen w-screen overflow-hidden bg-[#030303] text-white p-4 flex gap-4 font-sans selection:bg-purple-500/30">
+      {/* 100dvh for Mobile browsers to ignore URL bar height */}
+      <div className="h-[100dvh] w-screen overflow-hidden bg-[#030303] text-white p-2 md:p-4 flex gap-2 md:gap-4 font-sans selection:bg-purple-500/30 relative">
         
         {toast && (
-          <div className={`absolute top-6 left-1/2 transform -translate-x-1/2 z-50 px-6 py-3 rounded-full backdrop-blur-xl border shadow-2xl transition-all animate-in fade-in slide-in-from-top-5 ${toast.type === "success" ? "bg-green-500/10 border-green-500/30 text-green-400" : "bg-red-500/10 border-red-500/30 text-red-400"}`}>
+          <div className={`absolute top-4 md:top-6 left-1/2 transform -translate-x-1/2 z-[99999] w-[90%] md:w-auto px-6 py-3 text-center rounded-full backdrop-blur-xl border shadow-2xl transition-all animate-in fade-in slide-in-from-top-5 ${toast.type === "success" ? "bg-green-500/10 border-green-500/30 text-green-400" : "bg-red-500/10 border-red-500/30 text-red-400"}`}>
             {toast.message}
           </div>
         )}
 
-        {/* PANE 1: SIDEBAR */}
-        <div className={`${isFullscreen || !isSidebarOpen ? "w-0 p-0 border-none opacity-0" : "w-64 p-5 border border-white/5"} bg-[#0a0a0a]/80 backdrop-blur-2xl rounded-3xl flex flex-col gap-6 shadow-2xl transition-all duration-500 overflow-hidden shrink-0`}>
+        {/* MOBILE SIDEBAR BACKDROP */}
+        <div 
+          className={`fixed inset-0 bg-black/60 backdrop-blur-sm z-[90] transition-opacity duration-300 md:hidden ${isSidebarOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"}`} 
+          onClick={() => setIsSidebarOpen(false)} 
+        />
+
+        {/* PANE 1: SIDEBAR (Off-canvas on mobile) */}
+        <div className={`${isFullscreen ? "md:w-0 md:p-0 md:border-none md:opacity-0 hidden md:flex" : ""} absolute md:relative inset-y-2 left-2 md:inset-auto z-[100] md:z-auto ${!isSidebarOpen ? "-translate-x-[120%] md:translate-x-0 md:w-0 md:p-0 md:border-none md:opacity-0" : "translate-x-0 w-[260px] md:w-64 p-4 md:p-5 border border-white/5"} bg-[#0a0a0a]/95 md:bg-[#0a0a0a]/80 backdrop-blur-2xl rounded-2xl md:rounded-3xl flex flex-col gap-6 shadow-2xl transition-all duration-500 overflow-hidden shrink-0`}>
           <div className="flex items-center justify-between min-w-max">
             <div className="flex items-center gap-3 text-white font-bold tracking-widest text-xl">
               <Hexagon className="text-purple-500 fill-purple-500/10" size={24} /> FUISHAN
@@ -312,19 +295,10 @@ export default function FuishanApp() {
             <div className="text-xs font-semibold text-gray-500 mb-3 tracking-wider">WORKSPACE</div>
             {projects.map(p => (
               <div key={p.id} className={`group w-full rounded-xl text-sm flex items-center justify-between transition-all border ${currentProjectId === p.id ? "bg-white/10 text-white border-white/10 shadow-lg" : "border-transparent text-gray-500 hover:text-gray-300 hover:bg-white/5"}`}>
-                <button 
-                  onClick={() => { setCurrentProjectId(p.id); setHistoryIndex(p.codeHistory.length - 1); }} 
-                  className="flex-1 flex items-center gap-3 px-3 py-2 truncate text-left outline-none"
-                >
+                <button onClick={() => { setCurrentProjectId(p.id); setHistoryIndex(p.codeHistory.length - 1); if(window.innerWidth<768) setIsSidebarOpen(false); }} className="flex-1 flex items-center gap-3 px-3 py-2 truncate text-left outline-none">
                   <MessageSquare size={16} className="shrink-0" /> <span className="truncate">{p.name}</span>
                 </button>
-                <button 
-                  onClick={(e) => deleteProject(e, p.id)}
-                  className="px-3 py-2 opacity-0 group-hover:opacity-100 hover:text-red-400 transition-all shrink-0 outline-none"
-                  title="Delete Project"
-                >
-                  <Trash2 size={14} />
-                </button>
+                <button onClick={(e) => deleteProject(e, p.id)} className="px-3 py-2 md:opacity-0 group-hover:opacity-100 hover:text-red-400 transition-all shrink-0 outline-none" title="Delete Project"><Trash2 size={14} /></button>
               </div>
             ))}
             <button onClick={createNewProject} className="w-full text-left px-3 py-2 rounded-xl text-sm flex items-center gap-3 text-gray-500 hover:bg-white/5 hover:text-white transition-all active:scale-95 mt-2">
@@ -351,20 +325,26 @@ export default function FuishanApp() {
           </div>
         </div>
 
-        {/* PANE 2: CHAT INTERFACE */}
-        <div className={`${isFullscreen ? "hidden" : "w-[400px]"} bg-[#0a0a0a]/80 backdrop-blur-2xl border border-white/5 rounded-3xl flex flex-col shadow-2xl relative transition-all duration-300 shrink-0`}>
-          <div className="h-16 border-b border-white/5 flex items-center justify-between px-4 bg-white/5 rounded-t-3xl shrink-0">
-             <div className="flex items-center gap-3">
+        {/* PANE 2: CHAT INTERFACE (Mobile Toggleable) */}
+        <div className={`${isFullscreen ? "hidden" : ""} ${mobileTab === 'preview' ? 'hidden md:flex' : 'flex'} w-full md:w-[400px] flex-1 md:flex-auto bg-[#0a0a0a]/80 backdrop-blur-2xl border border-white/5 rounded-2xl md:rounded-3xl flex-col shadow-2xl relative transition-all duration-300 shrink-0`}>
+          <div className="h-14 md:h-16 border-b border-white/5 flex items-center justify-between px-3 md:px-4 bg-white/5 rounded-t-2xl md:rounded-t-3xl shrink-0">
+             <div className="flex items-center gap-2 md:gap-3">
                <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 text-gray-400 hover:text-white hover:bg-white/10 rounded-xl transition-all active:scale-95">
                  {isSidebarOpen ? <PanelLeftClose size={18}/> : <PanelLeftOpen size={18}/>}
                </button>
                <span className="font-medium text-gray-200 text-sm tracking-wide">Vibe Console</span>
              </div>
-             <button onClick={() => setShowSettings(!showSettings)} className="p-2 text-gray-400 hover:text-purple-400 hover:bg-white/10 rounded-xl transition-all active:scale-95"><Settings size={18} /></button>
+             <div className="flex items-center gap-1 md:gap-2">
+               <button onClick={() => setShowSettings(!showSettings)} className="p-2 text-gray-400 hover:text-purple-400 hover:bg-white/10 rounded-xl transition-all active:scale-95"><Settings size={18} /></button>
+               {/* MOBILE ONLY: Switch to Preview Tab */}
+               <button onClick={() => setMobileTab('preview')} className="md:hidden p-2 text-purple-400 hover:bg-white/10 rounded-xl transition-all active:scale-95">
+                 <MonitorPlay size={18} />
+               </button>
+             </div>
           </div>
 
           {showSettings && (
-            <div className="absolute top-16 left-0 w-full bg-[#050505]/95 backdrop-blur-3xl border-b border-white/10 p-5 z-20 shadow-2xl">
+            <div className="absolute top-14 md:top-16 left-0 w-full bg-[#050505]/95 backdrop-blur-3xl border-b border-white/10 p-5 z-20 shadow-2xl">
               <input type="password" placeholder="Google AI Studio Key" value={apiKey} onChange={(e) => setApiKey(e.target.value)} 
                 className="w-full bg-white/5 border border-white/10 text-sm p-3 mb-3 rounded-xl focus:outline-none focus:border-purple-500 focus:bg-white/10 transition-all relative z-50" />
               <select value={model} onChange={(e) => setModel(e.target.value)} className="w-full bg-white/5 border border-white/10 text-sm p-3 mb-4 rounded-xl focus:outline-none focus:border-purple-500 text-gray-300 appearance-none transition-all">
@@ -375,7 +355,7 @@ export default function FuishanApp() {
             </div>
           )}
 
-          <div className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-hide min-h-0">
+          <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 md:space-y-6 scrollbar-hide min-h-0">
             {currentProject?.messages.length === 0 && (
               <div className="h-full flex flex-col items-center justify-center text-center opacity-40 space-y-4">
                 <Hexagon className="w-12 h-12 text-gray-400" />
@@ -391,53 +371,63 @@ export default function FuishanApp() {
             <div ref={messagesEndRef} />
           </div>
 
-          <div className="p-4 border-t border-white/5 bg-white/5 rounded-b-3xl shrink-0">
-            <div className="relative flex items-end bg-[#050505] border border-white/10 rounded-2xl focus-within:border-purple-500/50 focus-within:-translate-y-2 focus-within:shadow-[0_20px_50px_rgba(0,0,0,0.5)] transition-all duration-300 overflow-hidden group">
+          <div className="p-3 md:p-4 border-t border-white/5 bg-white/5 rounded-b-2xl md:rounded-b-3xl shrink-0">
+            <div className="relative flex items-end bg-[#050505] border border-white/10 rounded-2xl focus-within:border-purple-500/50 focus-within:-translate-y-1 md:focus-within:-translate-y-2 focus-within:shadow-[0_20px_50px_rgba(0,0,0,0.5)] transition-all duration-300 overflow-hidden group">
               <textarea 
                 value={input} 
                 onChange={(e) => setInput(e.target.value)} 
                 onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }} 
                 placeholder="Build a glassmorphic..." 
-                className="w-full bg-transparent p-4 pr-12 text-sm text-gray-200 focus:outline-none resize-none h-14 focus:h-32 transition-all duration-300 scrollbar-hide" 
+                className="w-full bg-transparent p-4 pr-12 text-sm text-gray-200 focus:outline-none resize-none h-14 focus:h-[120px] md:focus:h-32 transition-all duration-300 scrollbar-hide" 
               />
               <button onClick={handleSend} disabled={isLoading || !input.trim()} className="absolute right-2 bottom-2 p-2 bg-white/10 hover:bg-white/20 border border-white/10 text-white rounded-xl disabled:opacity-50 transition-all active:scale-90"><Send size={16} /></button>
             </div>
           </div>
         </div>
 
-        {/* PANE 3: PREVIEW / SANDBOX */}
-        <div className={`${isFullscreen ? "fixed inset-0 z-[9999] bg-[#050505] rounded-none border-none flex flex-col" : "flex-1 min-w-0 bg-[#0a0a0a]/80 backdrop-blur-2xl border border-white/5 rounded-3xl flex flex-col shadow-2xl relative transition-all duration-500 overflow-hidden"}`}>
-          <div className="h-16 border-b border-white/5 bg-white/5 flex items-center justify-between px-6 shrink-0">
-            <div className="flex gap-2 bg-[#050505] p-1 rounded-xl border border-white/5">
-              <button onClick={() => setView("preview")} className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-sm transition-all active:scale-95 ${view === "preview" ? "bg-white/10 text-white shadow-md border border-white/5" : "text-gray-500 hover:text-white"}`}><MonitorPlay size={14} /> Preview</button>
-              <button onClick={() => setView("code")} className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-sm transition-all active:scale-95 ${view === "code" ? "bg-white/10 text-white shadow-md border border-white/5" : "text-gray-500 hover:text-white"}`}><Code2 size={14} /> Code</button>
+        {/* PANE 3: PREVIEW / SANDBOX (Mobile Toggleable) */}
+        <div className={`${isFullscreen ? "fixed inset-0 z-[9999] bg-[#050505] rounded-none border-none flex flex-col" : `flex-1 min-w-0 bg-[#0a0a0a]/80 backdrop-blur-2xl border border-white/5 rounded-2xl md:rounded-3xl flex-col shadow-2xl relative transition-all duration-500 overflow-hidden ${mobileTab === 'chat' ? 'hidden md:flex' : 'flex'}`}`}>
+          <div className="h-14 md:h-16 border-b border-white/5 bg-white/5 flex items-center justify-between px-2 md:px-6 shrink-0 overflow-x-auto scrollbar-hide">
+            
+            {/* LEFT SIDE CONTROLS */}
+            <div className="flex items-center gap-1 md:gap-2">
+              {/* MOBILE ONLY: Switch back to Chat Tab */}
+              <button onClick={() => setMobileTab('chat')} className="md:hidden p-2 text-purple-400 hover:bg-white/10 rounded-xl shrink-0 active:scale-95">
+                 <MessageSquare size={18} />
+              </button>
+
+              <div className="flex gap-1 bg-[#050505] p-1 rounded-xl border border-white/5 shrink-0">
+                <button onClick={() => setView("preview")} className={`flex items-center gap-1 md:gap-2 px-3 md:px-4 py-1.5 rounded-lg text-sm transition-all active:scale-95 ${view === "preview" ? "bg-white/10 text-white shadow-md border border-white/5" : "text-gray-500 hover:text-white"}`}><MonitorPlay size={14} /> <span className="hidden sm:inline">Preview</span></button>
+                <button onClick={() => setView("code")} className={`flex items-center gap-1 md:gap-2 px-3 md:px-4 py-1.5 rounded-lg text-sm transition-all active:scale-95 ${view === "code" ? "bg-white/10 text-white shadow-md border border-white/5" : "text-gray-500 hover:text-white"}`}><Code2 size={14} /> <span className="hidden sm:inline">Code</span></button>
+              </div>
             </div>
 
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-1 bg-[#050505] rounded-xl border border-white/5 p-1">
+            {/* RIGHT SIDE CONTROLS */}
+            <div className="flex items-center gap-1 md:gap-3 shrink-0">
+              <div className="flex items-center gap-1 bg-[#050505] rounded-xl border border-white/5 p-1 shrink-0">
                 <button onClick={handleUndo} disabled={historyIndex <= 0} className="p-1.5 text-gray-500 hover:text-white disabled:opacity-30 rounded-lg hover:bg-white/10 transition-all active:scale-90" title="Undo"><Undo2 size={16}/></button>
                 <button onClick={handleRedo} disabled={!currentProject || historyIndex >= currentProject.codeHistory.length - 1} className="p-1.5 text-gray-500 hover:text-white disabled:opacity-30 rounded-lg hover:bg-white/10 transition-all active:scale-90" title="Redo"><Redo2 size={16}/></button>
               </div>
-              <button onClick={() => setIsFullscreen(!isFullscreen)} className="p-2 text-gray-500 hover:text-white bg-[#050505] rounded-xl border border-white/5 transition-all active:scale-90">
+              <button onClick={() => setIsFullscreen(!isFullscreen)} className="hidden md:block p-2 text-gray-500 hover:text-white bg-[#050505] rounded-xl border border-white/5 transition-all active:scale-90 shrink-0">
                 {isFullscreen ? <Minimize size={16}/> : <Maximize size={16}/>}
               </button>
 
-              <div className="flex items-center gap-2 ml-4 pl-4 border-l border-white/10">
+              <div className="flex items-center gap-2 ml-2 md:ml-4 pl-2 md:pl-4 border-l border-white/10 shrink-0">
                  {showGithubConfig ? (
-                   <div className="flex items-center gap-2 group">
-                     <input type="text" placeholder="user/repo" value={githubRepo} onChange={(e)=>setGithubRepo(e.target.value)} className="bg-white/5 border border-white/10 text-xs p-2 rounded-lg focus:outline-none focus:border-purple-500 focus:scale-[1.05] transition-all w-24 focus:w-32" />
-                     <input type="password" placeholder="PAT" value={githubPAT} onChange={(e)=>setGithubPAT(e.target.value)} className="bg-white/5 border border-white/10 text-xs p-2 rounded-lg focus:outline-none focus:border-purple-500 focus:scale-[1.05] transition-all w-20 focus:w-28" />
-                     <button onClick={() => setShowGithubConfig(false)} className="bg-white/10 text-xs px-3 py-2 rounded-lg border border-white/10 hover:bg-white/20 active:scale-95 transition-all">Save</button>
+                   <div className="flex items-center gap-1 md:gap-2 group">
+                     <input type="text" placeholder="user/repo" value={githubRepo} onChange={(e)=>setGithubRepo(e.target.value)} className="bg-white/5 border border-white/10 text-xs p-2 rounded-lg focus:outline-none focus:border-purple-500 transition-all w-20 md:w-24 focus:w-28 md:focus:w-32" />
+                     <input type="password" placeholder="PAT" value={githubPAT} onChange={(e)=>setGithubPAT(e.target.value)} className="bg-white/5 border border-white/10 text-xs p-2 rounded-lg focus:outline-none focus:border-purple-500 transition-all w-16 md:w-20 focus:w-20 md:focus:w-28" />
+                     <button onClick={() => setShowGithubConfig(false)} className="bg-white/10 text-xs px-2 md:px-3 py-2 rounded-lg border border-white/10 hover:bg-white/20 active:scale-95 transition-all">Save</button>
                    </div>
                  ) : (
                    <>
                      <button onClick={() => setShowGithubConfig(true)} className="p-2 text-gray-500 hover:text-white transition-all active:scale-90"><Settings size={16}/></button>
-                     <input type="text" value={fileName} onChange={(e) => setFileName(e.target.value)} className="bg-[#050505] border border-white/5 text-xs p-2 rounded-xl text-gray-300 focus:outline-none focus:border-white/20 focus:scale-[1.05] transition-all w-28 focus:w-36" />
-                     <button onClick={handleGithubPush} disabled={!currentCode || isPushing} className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 text-white transition-all active:scale-95 rounded-xl border border-white/10 text-sm font-medium disabled:opacity-50">
-                      {isPushing ? <Loader2 size={14} className="animate-spin" /> : <Github size={14} />} Push
+                     <input type="text" value={fileName} onChange={(e) => setFileName(e.target.value)} className="bg-[#050505] border border-white/5 text-xs p-2 rounded-xl text-gray-300 focus:outline-none focus:border-white/20 transition-all w-24 md:w-28 focus:w-28 md:focus:w-36 hidden sm:block" />
+                     <button onClick={handleGithubPush} disabled={!currentCode || isPushing} className="flex items-center gap-1 md:gap-2 px-3 md:px-4 py-2 bg-white/10 hover:bg-white/20 text-white transition-all active:scale-95 rounded-xl border border-white/10 text-sm font-medium disabled:opacity-50">
+                      {isPushing ? <Loader2 size={14} className="animate-spin" /> : <Github size={14} />} <span className="hidden sm:inline">Push</span>
                      </button>
                      {githubRepo && (
-                       <a href={`https://vercel.com/new/clone?repository-url=https://github.com/${githubRepo}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-4 py-2 bg-black hover:bg-[#111] text-white border border-white/20 transition-all active:scale-95 rounded-xl shadow-lg text-sm font-medium">▲ Vercel</a>
+                       <a href={`https://vercel.com/new/clone?repository-url=https://github.com/${githubRepo}`} target="_blank" rel="noopener noreferrer" className="hidden lg:flex items-center gap-2 px-4 py-2 bg-black hover:bg-[#111] text-white border border-white/20 transition-all active:scale-95 rounded-xl shadow-lg text-sm font-medium">▲ Vercel</a>
                      )}
                    </>
                  )}
@@ -445,24 +435,23 @@ export default function FuishanApp() {
             </div>
           </div>
 
-          <div className={`flex-1 min-h-0 w-full bg-[#030303] relative overflow-hidden flex flex-col ${isFullscreen ? "rounded-none" : "rounded-b-3xl"}`}>
+          <div className={`flex-1 min-h-0 w-full bg-[#030303] relative overflow-hidden flex flex-col ${isFullscreen ? "rounded-none" : "rounded-b-2xl md:rounded-b-3xl"}`}>
             {!safeCurrentCode ? (
                <div className="flex h-full items-center justify-center relative">
-                 {/* FLUID GLASSMORPHISM EMPTY STATE */}
                  <div className="fluid-bg">
                    <div className="f-blob1"></div>
                    <div className="f-blob2"></div>
                    <div className="f-blob3"></div>
                    <div className="glass-overlay"></div>
                    <div className="glass-content">
-                     <div className="font-bold tracking-[0.5em] text-white/50 z-10 text-xl pointer-events-none">AWAITING INPUT</div>
+                     <div className="font-bold tracking-[0.3em] md:tracking-[0.5em] text-white/50 z-10 text-lg md:text-xl pointer-events-none text-center px-4">AWAITING INPUT</div>
                    </div>
                  </div>
                </div>
             ) : view === "preview" ? (
               <iframe srcDoc={safeCurrentCode} className="w-full h-full border-none bg-white flex-1" sandbox="allow-scripts allow-forms allow-popups allow-modals allow-same-origin" />
             ) : (
-              <div className="w-full flex-1 overflow-auto p-6 text-gray-300 text-sm font-mono leading-relaxed bg-[#050505]">
+              <div className="w-full flex-1 overflow-auto p-4 md:p-6 text-gray-300 text-xs md:text-sm font-mono leading-relaxed bg-[#050505]">
                 <pre><code>{currentCode}</code></pre>
               </div>
             )}
