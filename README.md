@@ -53,25 +53,32 @@ Want to run your own instance of FUISHAN? It takes less than 3 minutes.
 git clone https://github.com/srijan7815-bit/FUISHAN-powered-by-google.git
 cd FUISHAN-powered-by-google
 npm install
-2. Configure Firebase (Cloud Sync)
+```
+### 2. Configure Firebase (Cloud Sync)
 1) Create a free project at Firebase Console.
 2) Enable Google Authentication and a Firestore Database.
 3) Open src/lib/firebase.ts and replace the placeholder firebaseConfig object with your actual project keys.
 4) In your Firestore Rules, ensure only authenticated users can access their data:
-code
-JavaScript
+```JavaScript
 match /users/{userId} {
   allow read, write: if request.auth != null && request.auth.uid == userId;
 }
-3. Start the Vibe
-code
-Bash
+```
+### 3. Start the Vibe
+```Bash
 npm run dev
+```
 Open http://localhost:3000 in your browser. Click the Settings Gear ⚙️, paste your free Google AI Studio API key, and start creating!
-🤝 Contributing
+
+## 🤝 Contributing
+
 Please see our CONTRIBUTING.md file for details on how to get involved, submit pull requests, and push the vision forward.
-📄 License
+
+
+## 📄 License
+
 Distributed under the MIT License. See LICENSE for more information. Built for the culture.
+
 <br>
 <div align="center">
 <em><strong>new-order-is-upon-us</strong></em>
