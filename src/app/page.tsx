@@ -62,7 +62,7 @@ export default function FuishanApp() {
 
   const showToast = (message: string, type: "success" | "error") => {
     setToast({ message, type });
-    setTimeout(() => setToast(null), 4000);
+    setTimeout(() => setToast(null), 5000);
   };
 
   // INITIALIZATION & FIREBASE AUTH
@@ -125,7 +125,9 @@ export default function FuishanApp() {
       const syncToCloud = async () => {
         setIsSyncing(true);
         try { 
-          await setDoc(doc(db, "users", user.uid), { projects }, { merge: true }); 
+          // BULLETPROOF FIX: Deep clone and strip any accidental 'undefined' fields before syncing
+          const sanitizedProjects = JSON.parse(JSON.stringify(projects));
+          await setDoc(doc(db, "users", user.uid), { projects: sanitizedProjects }, { merge: true }); 
         } catch (e) { 
           console.error("Cloud sync failed", e);
           showToast("Cloud Sync Blocked: Check Firebase Rules!", "error"); 
@@ -141,7 +143,7 @@ export default function FuishanApp() {
 
   // CREATE NEW PROJECT
   const createNewProject = () => {
-    const newProj: Project = { id: Date.now().toString(), name: `Project ${projects.length + 1}`, messages: [], codeHistory:[] };
+    const newProj: Project = { id: Date.now().toString(), name: `Project ${projects.length + 1}`, messages:[], codeHistory:[] };
     setProjects(prev =>[...prev, newProj]);
     setCurrentProjectId(newProj.id);
     setHistoryIndex(-1);
@@ -149,13 +151,12 @@ export default function FuishanApp() {
 
   // DELETE PROJECT
   const deleteProject = (e: React.MouseEvent, idToDelete: string) => {
-    e.stopPropagation(); // Prevent opening the project when clicking the trash icon
+    e.stopPropagation(); 
     if (!confirm("Are you sure you want to delete this project?")) return;
 
     setProjects(prev => {
       const updatedProjects = prev.filter(p => p.id !== idToDelete);
       
-      // If we deleted the last project, create a fresh one instantly
       if (updatedProjects.length === 0) {
         const freshProj: Project = { id: Date.now().toString(), name: `Project 1`, messages: [], codeHistory:[] };
         setCurrentProjectId(freshProj.id);
@@ -163,7 +164,6 @@ export default function FuishanApp() {
         return [freshProj];
       }
 
-      // If we deleted the project we were currently viewing, switch to the first available one
       if (currentProjectId === idToDelete) {
         setCurrentProjectId(updatedProjects[0].id);
         setHistoryIndex(updatedProjects[0].codeHistory.length - 1);
@@ -179,6 +179,7 @@ export default function FuishanApp() {
   const handleUndo = () => { if (historyIndex > 0) setHistoryIndex(prev => prev - 1); };
   const handleRedo = () => { if (currentProject && historyIndex < currentProject.codeHistory.length - 1) setHistoryIndex(prev => prev + 1); };
 
+  // SEND MESSAGE & GENERATE CODE
   const handleSend = async () => {
     if (!input.trim() || !currentProjectId) return;
     if (!apiKey) { showToast("Please set your API Key in Settings.", "error"); setShowSettings(true); return; }
@@ -201,10 +202,16 @@ export default function FuishanApp() {
       });
       const data = await res.json();
       
+      // BULLETPROOF FIX: Catch API errors BEFORE they corrupt the chat history and crash Firebase
+      if (!res.ok || data.error) {
+        throw new Error(data.error || "The AI Provider returned an error. Please try again.");
+      }
+      
       setProjects(prev => prev.map(p => {
         if (p.id !== currentProjectId) return p;
         let updatedHistory =[...p.codeHistory];
         let newMsg: Message;
+        
         if (data.isCode) {
           updatedHistory = updatedHistory.slice(0, historyIndex + 1);
           updatedHistory.push(data.code);
@@ -216,7 +223,8 @@ export default function FuishanApp() {
         return { ...p, messages:[...p.messages, newMsg], codeHistory: updatedHistory };
       }));
     } catch (error) {
-      showToast("Generation failed.", "error");
+      console.error(error);
+      showToast(`API Error: ${(error as Error).message}`, "error");
     } finally {
       setIsLoading(false);
     }
