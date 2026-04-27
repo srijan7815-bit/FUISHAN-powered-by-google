@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { Send, Github, Loader2, Code2, MonitorPlay, Save, Settings, Maximize, Minimize, Undo2, Redo2, FolderPlus, MessageSquare, Cloud, UserCircle, Triangle, LogOut, PanelLeftClose, PanelLeftOpen, Hexagon } from "lucide-react";
+import { Send, Github, Loader2, Code2, MonitorPlay, Save, Settings, Maximize, Minimize, Undo2, Redo2, FolderPlus, MessageSquare, Cloud, UserCircle, Triangle, LogOut, PanelLeftClose, PanelLeftOpen, Hexagon, Trash2 } from "lucide-react";
 // FIREBASE IMPORTS
 import { auth, db, googleProvider } from "../lib/firebase";
 import { signInWithPopup, signOut, onAuthStateChanged, User } from "firebase/auth";
@@ -11,28 +11,28 @@ type Message = { role: "user" | "assistant"; content: string; isCode?: boolean }
 type Project = { id: string; name: string; messages: Message[]; codeHistory: string[] };
 
 export default function FuishanApp() {
-  const [showSettings, setShowSettings] = useState(false);
-  const[apiKey, setApiKey] = useState("");
-  const [model, setModel] = useState("gemma-4-31b-it");
+  const[showSettings, setShowSettings] = useState(false);
+  const [apiKey, setApiKey] = useState("");
+  const[model, setModel] = useState("gemma-4-31b-it");
 
-  const [showGithubConfig, setShowGithubConfig] = useState(false);
-  const[githubPAT, setGithubPAT] = useState("");
+  const[showGithubConfig, setShowGithubConfig] = useState(false);
+  const [githubPAT, setGithubPAT] = useState("");
   const [githubRepo, setGithubRepo] = useState("");
   const [fileName, setFileName] = useState("index.html");
-  const[isPushing, setIsPushing] = useState(false);
+  const [isPushing, setIsPushing] = useState(false);
 
   const [projects, setProjects] = useState<Project[]>([]);
-  const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
-  const[historyIndex, setHistoryIndex] = useState(-1);
+  const[currentProjectId, setCurrentProjectId] = useState<string | null>(null);
+  const [historyIndex, setHistoryIndex] = useState(-1);
   const [user, setUser] = useState<User | null>(null);
-  const [isSyncing, setIsSyncing] = useState(false);
-  const[isLoaded, setIsLoaded] = useState(false); // BUGFIX: Prevent Firebase overwrite on load
+  const[isSyncing, setIsSyncing] = useState(false);
+  const [isLoaded, setIsLoaded] = useState(false); 
   
   const [input, setInput] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
+  const[isLoading, setIsLoading] = useState(false);
   const [view, setView] = useState<"preview" | "code">("preview");
-  const[isFullscreen, setIsFullscreen] = useState(false);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const[isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -109,7 +109,7 @@ export default function FuishanApp() {
           createNewProject();
         }
       }
-      setIsLoaded(true); // Mark as safely loaded
+      setIsLoaded(true); 
     });
 
     return () => unsubscribe();
@@ -139,11 +139,39 @@ export default function FuishanApp() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [projects, user, isLoaded]);
 
+  // CREATE NEW PROJECT
   const createNewProject = () => {
     const newProj: Project = { id: Date.now().toString(), name: `Project ${projects.length + 1}`, messages: [], codeHistory:[] };
-    setProjects(prev => [...prev, newProj]);
+    setProjects(prev =>[...prev, newProj]);
     setCurrentProjectId(newProj.id);
     setHistoryIndex(-1);
+  };
+
+  // DELETE PROJECT
+  const deleteProject = (e: React.MouseEvent, idToDelete: string) => {
+    e.stopPropagation(); // Prevent opening the project when clicking the trash icon
+    if (!confirm("Are you sure you want to delete this project?")) return;
+
+    setProjects(prev => {
+      const updatedProjects = prev.filter(p => p.id !== idToDelete);
+      
+      // If we deleted the last project, create a fresh one instantly
+      if (updatedProjects.length === 0) {
+        const freshProj: Project = { id: Date.now().toString(), name: `Project 1`, messages: [], codeHistory:[] };
+        setCurrentProjectId(freshProj.id);
+        setHistoryIndex(-1);
+        return [freshProj];
+      }
+
+      // If we deleted the project we were currently viewing, switch to the first available one
+      if (currentProjectId === idToDelete) {
+        setCurrentProjectId(updatedProjects[0].id);
+        setHistoryIndex(updatedProjects[0].codeHistory.length - 1);
+      }
+
+      return updatedProjects;
+    });
+    showToast("Project deleted.", "success");
   };
 
   const handleLogin = async () => { try { await signInWithPopup(auth, googleProvider); showToast("Signed in!", "success"); } catch (error) { showToast("Sign in failed. Check Firebase config.", "error"); } };
@@ -160,7 +188,7 @@ export default function FuishanApp() {
     setInput("");
     setIsLoading(true);
 
-    const projectMessages = currentProject?.messages || [];
+    const projectMessages = currentProject?.messages ||[];
     const payloadMessages =[...projectMessages, newMessage].map((msg, idx, arr) => {
       if (msg.role === "assistant" && msg.isCode && idx < arr.length - 2) return { role: "assistant", content: "[Code omitted]" };
       return msg;
@@ -185,7 +213,7 @@ export default function FuishanApp() {
         } else {
           newMsg = { role: "assistant", content: data.raw, isCode: false };
         }
-        return { ...p, messages: [...p.messages, newMsg], codeHistory: updatedHistory };
+        return { ...p, messages:[...p.messages, newMsg], codeHistory: updatedHistory };
       }));
     } catch (error) {
       showToast("Generation failed.", "error");
@@ -226,7 +254,7 @@ export default function FuishanApp() {
   return (
     <>
       <style>{`
-        /* NEW FLUID GLASSMORPHISM BACKGROUND */
+        /* FLUID GLASSMORPHISM BACKGROUND */
         @keyframes fluid1 {
           0% { transform: translate(0, 0) scale(1); }
           33% { transform: translate(5%, -10%) scale(1.2); }
@@ -254,7 +282,7 @@ export default function FuishanApp() {
         .glass-content { position: relative; z-index: 20; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; }
       `}</style>
 
-      {/* NEW DARK AESTHETIC BASE */}
+      {/* DARK AESTHETIC BASE */}
       <div className="h-screen w-screen overflow-hidden bg-[#030303] text-white p-4 flex gap-4 font-sans selection:bg-purple-500/30">
         
         {toast && (
@@ -275,9 +303,21 @@ export default function FuishanApp() {
           <div className="flex-1 overflow-y-auto space-y-2 pr-2 scrollbar-hide min-w-max">
             <div className="text-xs font-semibold text-gray-500 mb-3 tracking-wider">WORKSPACE</div>
             {projects.map(p => (
-              <button key={p.id} onClick={() => { setCurrentProjectId(p.id); setHistoryIndex(p.codeHistory.length - 1); }} className={`w-full text-left px-3 py-2 rounded-xl text-sm flex items-center gap-3 transition-all active:scale-95 ${currentProjectId === p.id ? "bg-white/10 text-white border border-white/10 shadow-lg" : "text-gray-500 hover:text-gray-300 hover:bg-white/5"}`}>
-                <MessageSquare size={16} /> <span className="truncate">{p.name}</span>
-              </button>
+              <div key={p.id} className={`group w-full rounded-xl text-sm flex items-center justify-between transition-all border ${currentProjectId === p.id ? "bg-white/10 text-white border-white/10 shadow-lg" : "border-transparent text-gray-500 hover:text-gray-300 hover:bg-white/5"}`}>
+                <button 
+                  onClick={() => { setCurrentProjectId(p.id); setHistoryIndex(p.codeHistory.length - 1); }} 
+                  className="flex-1 flex items-center gap-3 px-3 py-2 truncate text-left outline-none"
+                >
+                  <MessageSquare size={16} className="shrink-0" /> <span className="truncate">{p.name}</span>
+                </button>
+                <button 
+                  onClick={(e) => deleteProject(e, p.id)}
+                  className="px-3 py-2 opacity-0 group-hover:opacity-100 hover:text-red-400 transition-all shrink-0 outline-none"
+                  title="Delete Project"
+                >
+                  <Trash2 size={14} />
+                </button>
+              </div>
             ))}
             <button onClick={createNewProject} className="w-full text-left px-3 py-2 rounded-xl text-sm flex items-center gap-3 text-gray-500 hover:bg-white/5 hover:text-white transition-all active:scale-95 mt-2">
               <FolderPlus size={16} /> New Project
@@ -357,7 +397,7 @@ export default function FuishanApp() {
           </div>
         </div>
 
-        {/* PANE 3: PREVIEW / SANDBOX - TRUE FULLSCREEN FIX */}
+        {/* PANE 3: PREVIEW / SANDBOX */}
         <div className={`${isFullscreen ? "fixed inset-0 z-[9999] bg-[#050505] rounded-none border-none flex flex-col" : "flex-1 min-w-0 bg-[#0a0a0a]/80 backdrop-blur-2xl border border-white/5 rounded-3xl flex flex-col shadow-2xl relative transition-all duration-500 overflow-hidden"}`}>
           <div className="h-16 border-b border-white/5 bg-white/5 flex items-center justify-between px-6 shrink-0">
             <div className="flex gap-2 bg-[#050505] p-1 rounded-xl border border-white/5">
