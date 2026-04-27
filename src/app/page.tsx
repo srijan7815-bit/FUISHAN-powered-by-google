@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { Send, Github, Loader2, Code2, MonitorPlay, Save, Settings, Maximize, Minimize, Undo2, Redo2, FolderPlus, MessageSquare, Cloud, UserCircle, Triangle, LogOut, PanelLeftClose, PanelLeftOpen, Hexagon, Trash2 } from "lucide-react";
+import { Send, Github, Loader2, Code2, MonitorPlay, Save, Settings, Maximize, Minimize, Undo2, Redo2, FolderPlus, MessageSquare, Cloud, UserCircle, LogOut, PanelLeftClose, PanelLeftOpen, Hexagon, Trash2 } from "lucide-react";
 // FIREBASE IMPORTS
 import { auth, db, googleProvider } from "../lib/firebase";
 import { signInWithPopup, signOut, onAuthStateChanged, User } from "firebase/auth";
@@ -12,13 +12,13 @@ type Project = { id: string; name: string; messages: Message[]; codeHistory: str
 
 export default function FuishanApp() {
   const[showSettings, setShowSettings] = useState(false);
-  const [apiKey, setApiKey] = useState("");
+  const[apiKey, setApiKey] = useState("");
   const[model, setModel] = useState("gemma-4-31b-it");
 
   const[showGithubConfig, setShowGithubConfig] = useState(false);
   const [githubPAT, setGithubPAT] = useState("");
   const [githubRepo, setGithubRepo] = useState("");
-  const [fileName, setFileName] = useState("index.html");
+  const[fileName, setFileName] = useState("index.html");
   const [isPushing, setIsPushing] = useState(false);
 
   const [projects, setProjects] = useState<Project[]>([]);
@@ -33,7 +33,7 @@ export default function FuishanApp() {
   const [view, setView] = useState<"preview" | "code">("preview");
   const [isFullscreen, setIsFullscreen] = useState(false);
   const[isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [mobileTab, setMobileTab] = useState<"chat" | "preview">("chat"); // NEW: Mobile UI State
+  const [mobileTab, setMobileTab] = useState<"chat" | "preview">("chat"); 
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -68,7 +68,6 @@ export default function FuishanApp() {
 
   // INITIALIZATION & FIREBASE AUTH
   useEffect(() => {
-    // Auto-close sidebar on mobile devices for clean initial load
     if (window.innerWidth < 768) setIsSidebarOpen(false);
 
     const savedPAT = localStorage.getItem("fuishan_github_pat");
@@ -118,7 +117,7 @@ export default function FuishanApp() {
     return () => unsubscribe();
   },[]);
 
-  // AUTO-SAVE (LOCAL + CLOUD)
+  // AUTO-SAVE
   useEffect(() => {
     if (!isLoaded || projects.length === 0) return;
     localStorage.setItem("fuishan_projects", JSON.stringify(projects));
@@ -147,7 +146,7 @@ export default function FuishanApp() {
     setProjects(prev =>[...prev, newProj]);
     setCurrentProjectId(newProj.id);
     setHistoryIndex(-1);
-    if (window.innerWidth < 768) setIsSidebarOpen(false); // Auto close sidebar on mobile
+    if (window.innerWidth < 768) setIsSidebarOpen(false); 
   };
 
   const deleteProject = (e: React.MouseEvent, idToDelete: string) => {
@@ -175,7 +174,7 @@ export default function FuishanApp() {
   const handleUndo = () => { if (historyIndex > 0) setHistoryIndex(prev => prev - 1); };
   const handleRedo = () => { if (currentProject && historyIndex < currentProject.codeHistory.length - 1) setHistoryIndex(prev => prev + 1); };
 
-  // SEND MESSAGE & GENERATE CODE
+  // AI REQUEST
   const handleSend = async () => {
     if (!input.trim() || !currentProjectId) return;
     if (!apiKey) { showToast("Please set your API Key in Settings.", "error"); setShowSettings(true); return; }
@@ -210,7 +209,7 @@ export default function FuishanApp() {
           updatedHistory.push(data.code);
           setHistoryIndex(updatedHistory.length - 1);
           newMsg = { role: "assistant", content: "Code updated! Check the preview.", isCode: true };
-          if (window.innerWidth < 768) setMobileTab("preview"); // Auto-switch to preview on mobile
+          if (window.innerWidth < 768) setMobileTab("preview"); 
         } else {
           newMsg = { role: "assistant", content: data.raw, isCode: false };
         }
@@ -282,8 +281,14 @@ export default function FuishanApp() {
           onClick={() => setIsSidebarOpen(false)} 
         />
 
-        {/* PANE 1: SIDEBAR (Off-canvas on mobile) */}
-        <div className={`${isFullscreen ? "md:w-0 md:p-0 md:border-none md:opacity-0 hidden md:flex" : ""} absolute md:relative inset-y-2 left-2 md:inset-auto z-[100] md:z-auto ${!isSidebarOpen ? "-translate-x-[120%] md:translate-x-0 md:w-0 md:p-0 md:border-none md:opacity-0" : "translate-x-0 w-[260px] md:w-64 p-4 md:p-5 border border-white/5"} bg-[#0a0a0a]/95 md:bg-[#0a0a0a]/80 backdrop-blur-2xl rounded-2xl md:rounded-3xl flex flex-col gap-6 shadow-2xl transition-all duration-500 overflow-hidden shrink-0`}>
+        {/* PANE 1: SIDEBAR */}
+        <div className={`
+          bg-[#0a0a0a]/95 md:bg-[#0a0a0a]/80 backdrop-blur-2xl rounded-2xl md:rounded-3xl flex flex-col gap-6 shadow-2xl overflow-hidden shrink-0 transition-all duration-500
+          absolute inset-y-2 left-2 z-[100] w-[260px] p-4 border border-white/5 
+          ${isSidebarOpen ? "translate-x-0" : "-translate-x-[120%]"}
+          md:relative md:inset-auto md:translate-x-0 md:z-auto
+          ${!isSidebarOpen ? "md:w-0 md:p-0 md:border-none md:opacity-0" : "md:w-64 md:p-5 md:border md:border-white/5"}
+        `}>
           <div className="flex items-center justify-between min-w-max">
             <div className="flex items-center gap-3 text-white font-bold tracking-widest text-xl">
               <Hexagon className="text-purple-500 fill-purple-500/10" size={24} /> FUISHAN
@@ -325,8 +330,12 @@ export default function FuishanApp() {
           </div>
         </div>
 
-        {/* PANE 2: CHAT INTERFACE (Mobile Toggleable) */}
-        <div className={`${isFullscreen ? "hidden" : ""} ${mobileTab === 'preview' ? 'hidden md:flex' : 'flex'} w-full md:w-[400px] flex-1 md:flex-auto bg-[#0a0a0a]/80 backdrop-blur-2xl border border-white/5 rounded-2xl md:rounded-3xl flex-col shadow-2xl relative transition-all duration-300 shrink-0`}>
+        {/* PANE 2: CHAT INTERFACE */}
+        <div className={`
+          bg-[#0a0a0a]/80 backdrop-blur-2xl border border-white/5 rounded-2xl md:rounded-3xl flex-col shadow-2xl relative transition-all duration-300 shrink-0
+          ${mobileTab === 'preview' ? 'hidden md:flex' : 'flex w-full flex-1'}
+          ${isFullscreen ? "md:hidden" : "md:w-[400px] md:flex-none"}
+        `}>
           <div className="h-14 md:h-16 border-b border-white/5 flex items-center justify-between px-3 md:px-4 bg-white/5 rounded-t-2xl md:rounded-t-3xl shrink-0">
              <div className="flex items-center gap-2 md:gap-3">
                <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 text-gray-400 hover:text-white hover:bg-white/10 rounded-xl transition-all active:scale-95">
@@ -385,12 +394,17 @@ export default function FuishanApp() {
           </div>
         </div>
 
-        {/* PANE 3: PREVIEW / SANDBOX (Mobile Toggleable) */}
-        <div className={`${isFullscreen ? "fixed inset-0 z-[9999] bg-[#050505] rounded-none border-none flex flex-col" : `flex-1 min-w-0 bg-[#0a0a0a]/80 backdrop-blur-2xl border border-white/5 rounded-2xl md:rounded-3xl flex-col shadow-2xl relative transition-all duration-500 overflow-hidden ${mobileTab === 'chat' ? 'hidden md:flex' : 'flex'}`}`}>
+        {/* PANE 3: PREVIEW / SANDBOX */}
+        <div className={`
+          bg-[#0a0a0a]/80 backdrop-blur-2xl border border-white/5 rounded-2xl md:rounded-3xl flex-col shadow-2xl relative transition-all duration-500 overflow-hidden
+          ${mobileTab === 'chat' ? 'hidden md:flex' : 'flex'}
+          flex-1 min-w-0
+          ${isFullscreen ? "!fixed !inset-0 z-[9999] !bg-[#050505] !rounded-none !border-none" : ""}
+        `}>
           <div className="h-14 md:h-16 border-b border-white/5 bg-white/5 flex items-center justify-between px-2 md:px-6 shrink-0 overflow-x-auto scrollbar-hide">
             
             {/* LEFT SIDE CONTROLS */}
-            <div className="flex items-center gap-1 md:gap-2">
+            <div className="flex items-center gap-1 md:gap-2 shrink-0">
               {/* MOBILE ONLY: Switch back to Chat Tab */}
               <button onClick={() => setMobileTab('chat')} className="md:hidden p-2 text-purple-400 hover:bg-white/10 rounded-xl shrink-0 active:scale-95">
                  <MessageSquare size={18} />
@@ -417,17 +431,19 @@ export default function FuishanApp() {
                    <div className="flex items-center gap-1 md:gap-2 group">
                      <input type="text" placeholder="user/repo" value={githubRepo} onChange={(e)=>setGithubRepo(e.target.value)} className="bg-white/5 border border-white/10 text-xs p-2 rounded-lg focus:outline-none focus:border-purple-500 transition-all w-20 md:w-24 focus:w-28 md:focus:w-32" />
                      <input type="password" placeholder="PAT" value={githubPAT} onChange={(e)=>setGithubPAT(e.target.value)} className="bg-white/5 border border-white/10 text-xs p-2 rounded-lg focus:outline-none focus:border-purple-500 transition-all w-16 md:w-20 focus:w-20 md:focus:w-28" />
-                     <button onClick={() => setShowGithubConfig(false)} className="bg-white/10 text-xs px-2 md:px-3 py-2 rounded-lg border border-white/10 hover:bg-white/20 active:scale-95 transition-all">Save</button>
+                     <button onClick={() => setShowGithubConfig(false)} className="bg-white/10 text-xs px-2 md:px-3 py-2 rounded-lg border border-white/10 hover:bg-white/20 active:scale-95 transition-all shrink-0">Save</button>
                    </div>
                  ) : (
                    <>
-                     <button onClick={() => setShowGithubConfig(true)} className="p-2 text-gray-500 hover:text-white transition-all active:scale-90"><Settings size={16}/></button>
-                     <input type="text" value={fileName} onChange={(e) => setFileName(e.target.value)} className="bg-[#050505] border border-white/5 text-xs p-2 rounded-xl text-gray-300 focus:outline-none focus:border-white/20 transition-all w-24 md:w-28 focus:w-28 md:focus:w-36 hidden sm:block" />
-                     <button onClick={handleGithubPush} disabled={!currentCode || isPushing} className="flex items-center gap-1 md:gap-2 px-3 md:px-4 py-2 bg-white/10 hover:bg-white/20 text-white transition-all active:scale-95 rounded-xl border border-white/10 text-sm font-medium disabled:opacity-50">
-                      {isPushing ? <Loader2 size={14} className="animate-spin" /> : <Github size={14} />} <span className="hidden sm:inline">Push</span>
+                     <button onClick={() => setShowGithubConfig(true)} className="p-2 text-gray-500 hover:text-white transition-all active:scale-90 shrink-0"><Settings size={16}/></button>
+                     <input type="text" value={fileName} onChange={(e) => setFileName(e.target.value)} className="bg-[#050505] border border-white/5 text-xs p-2 rounded-xl text-gray-300 focus:outline-none focus:border-white/20 transition-all w-24 md:w-28 focus:w-28 md:focus:w-36 hidden sm:block shrink-0" />
+                     <button onClick={handleGithubPush} disabled={!currentCode || isPushing} className="flex items-center gap-1 md:gap-2 px-3 md:px-4 py-2 bg-white/10 hover:bg-white/20 text-white transition-all active:scale-95 rounded-xl border border-white/10 text-xs md:text-sm font-medium disabled:opacity-50 shrink-0">
+                      {isPushing ? <Loader2 size={14} className="animate-spin shrink-0" /> : <Github size={14} className="shrink-0" />} <span className="hidden sm:inline">Push</span>
                      </button>
                      {githubRepo && (
-                       <a href={`https://vercel.com/new/clone?repository-url=https://github.com/${githubRepo}`} target="_blank" rel="noopener noreferrer" className="hidden lg:flex items-center gap-2 px-4 py-2 bg-black hover:bg-[#111] text-white border border-white/20 transition-all active:scale-95 rounded-xl shadow-lg text-sm font-medium">▲ Vercel</a>
+                       <a href={`https://vercel.com/new/clone?repository-url=https://github.com/${githubRepo}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 md:gap-2 px-3 md:px-4 py-2 bg-black hover:bg-[#111] text-white border border-white/20 transition-all active:scale-95 rounded-xl shadow-lg text-xs md:text-sm font-medium shrink-0">
+                         ▲ <span className="hidden sm:inline">Vercel</span>
+                       </a>
                      )}
                    </>
                  )}
